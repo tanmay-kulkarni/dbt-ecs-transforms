@@ -1,0 +1,131 @@
+title: "DBT Workflow Architecture" {
+  near: top-center
+}
+
+
+# Define AWS infrastructure components
+aws: {
+  # Code Repository
+  codecommit: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FDeveloper%20Tools%2FAWS-CodeCommit.svg
+    label: "CodeCommit\n(DBT Models)"
+  }
+
+  # Build components
+  codebuild: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FDeveloper%20Tools%2FAWS-CodeBuild.svg
+    label: "CodeBuild\n(Docker Image)"
+  }
+
+  # Container services
+  ecr: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FCompute%2FAmazon-EC2-Container-Registry.svg
+    label: "ECR\n(Docker Registry)"
+  }
+
+  ecs: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FCompute%2FAmazon-Elastic-Container-Service.svg
+    label: "ECS (Fargate)\n(Run DBT Tasks)"
+  }
+
+  # Workflow orchestration
+  stepfunctions: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FApplication%20Integration%2FAWS-Step-Functions.svg
+    label: "Step Functions\n(Workflow)"
+  }
+
+  # Data Storage
+  secrets: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FSecurity%2C%20Identity%2C%20&%20Compliance%2FAWS-Secrets-Manager.svg
+    label: "Secrets Manager\n(DBT Credentials)"
+  }
+
+  redshift: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FAnalytics%2FAmazon-Redshift.svg
+    label: "Redshift\n(Data Warehouse)"
+  }
+
+  # Source Database
+  rds: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FDatabase%2FAmazon-RDS.svg
+    label: "Postgres RDS\n(Copilot DB)"
+  }
+
+  # Networking
+  vpc: {
+    shape: image
+    icon: https://icons.terrastruct.com/aws%2FNetworking%20&%20Content%20Delivery%2FAmazon-VPC.svg
+    label: "VPC"
+  }
+}
+
+# Scheduling - separate from aws to avoid nesting in image
+eventbridge: {
+  shape: image
+  icon: https://icons.terrastruct.com/aws%2FApplication%20Integration%2FAmazon-EventBridge.svg
+  label: "EventBridge\n(Scheduling)"
+}
+
+morning_trigger: {
+  shape: rectangle
+  label: "1 AM Daily Trigger"
+}
+
+evening_trigger: {
+  shape: rectangle
+  label: "1 PM Daily Trigger"
+}
+
+build_success_trigger: {
+  shape: rectangle
+  label: "On CodeBuild Success"
+}
+
+# DBT transformation process - single unit
+dbt: {
+  shape: image
+  icon: https://raw.githubusercontent.com/dbt-labs/dbt-core/main/etc/dbt-core.svg
+  label: "DBT Transformation Process\n(deps → snapshot → run → docs)"
+}
+
+# Define the main infrastructure flow
+aws.codecommit -> aws.codebuild: "Git push\ntriggers build" {style.animated: true}
+aws.codebuild -> aws.ecr: "Pushes Docker\nimage" {style.animated: true}
+aws.ecr -> aws.ecs: "Pulls latest\nimage" {style.animated: true}
+aws.secrets -> aws.ecs: "Provides\ncredentials" {style.animated: true}
+aws.stepfunctions -> aws.ecs: "Orchestrates\ntasks" {style.animated: true}
+
+# EventBridge triggers
+morning_trigger -> eventbridge: {style.animated: true}
+evening_trigger -> eventbridge: {style.animated: true}
+build_success_trigger -> eventbridge: {style.animated: true}
+eventbridge -> aws.stepfunctions: "Triggers workflow" {style.animated: true}
+aws.codebuild -> build_success_trigger: {style.animated: true}
+
+# DBT process flow
+aws.ecs -> dbt: "Runs DBT\ncommands" {style.animated: true}
+dbt -> aws.redshift: "Transforms &\nloads data" {style.animated: true}
+
+# Data flow
+aws.rds -> aws.redshift: "Raw data\nloaded via Airbyte" {style.animated: true}
+
+# Network relationships
+aws.ecs -> aws.vpc: "Runs in" {style.stroke-dash: 5}
+aws.redshift -> aws.vpc: "Runs in" {style.stroke-dash: 5}
+aws.rds -> aws.vpc: "Runs in" {style.stroke-dash: 5}
+
+# Add detailed styling
+style: {
+  fill: "#f8f9fa"
+  stroke: "#333333"
+  font-size: 14
+  font-color: "#333333"
+}
